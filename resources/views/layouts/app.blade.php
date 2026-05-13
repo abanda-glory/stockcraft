@@ -1,36 +1,57 @@
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <title>{{ config('app.name', 'Laravel') }}</title>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
-        <!-- Fonts -->
-        <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=figtree:400,500,600&display=swap" rel="stylesheet" />
+    <title>@yield('title', config('app.name'))</title>
 
-        <!-- Scripts -->
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    </head>
-    <body class="font-sans antialiased">
-        <div class="min-h-screen bg-gray-100">
-            @include('layouts.navigation')
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
 
-            <!-- Page Heading -->
-            @isset($header)
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endisset
+<body class="bg-gray-100 font-sans">
 
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
+    <div class="min-h-screen flex">
+
+        {{-- SIDEBAR --}}
+        <aside class="w-64 bg-slate-900 text-white p-4 space-y-4">
+            <h1 class="text-xl font-bold">📦 StockCraft</h1>
+
+            <nav class="space-y-2 text-sm">
+                <a href="{{ route('dashboard') }}" class="block hover:bg-slate-800 p-2 rounded">Dashboard</a>
+                <a href="{{ route('products.index') }}" class="block hover:bg-slate-800 p-2 rounded">Products</a>
+                <a href="{{ route('categories.index') }}" class="block hover:bg-slate-800 p-2 rounded">Categories</a>
+                <a href="{{ route('movements.index') }}" class="block hover:bg-slate-800 p-2 rounded">Stock Movements</a>
+                <a href="{{ route('reports.index') }}" class="block hover:bg-slate-800 p-2 rounded">Reports</a>
+                <a href="{{ route('generator.index') }}" class="block hover:bg-slate-800 p-2 rounded">Generator</a>
+            </nav>
+        </aside>
+
+        {{-- MAIN AREA --}}
+        <div class="flex-1">
+
+            {{-- TOP BAR --}}
+            <header class="bg-white shadow px-6 py-4 flex justify-between">
+                <div>
+                    <h2 class="font-semibold text-lg">@yield('breadcrumb')</h2>
+                </div>
+
+                <div>
+                    @yield('header-actions')
+                </div>
+            </header>
+
+            {{-- CONTENT --}}
+            <main class="p-6">
+                @yield('content')
             </main>
+
         </div>
-    </body>
+
+    </div>
+
+</body>
+
 </html>
