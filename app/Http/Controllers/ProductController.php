@@ -7,10 +7,13 @@ use App\Models\Product;
 use App\Models\StockMovement;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request)
     {
         $query = Product::where('user_id', auth()->id())

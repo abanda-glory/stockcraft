@@ -7,6 +7,7 @@ use App\Models\StockMovement;
 use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
 {
@@ -92,47 +93,88 @@ class ReportController extends Controller
         return view('reports.expiry', compact('expiringSoon', 'expired', 'days'));
     }
 
-    public function stockValue(Request $request)
+    public function stockValue()
     {
-        $userId = auth()->id();
+        $userId = Auth::id();
 
-        $products = Product::where('user_id', $userId)
-            ->with('category')
-            ->where('quantity', '>', 0)
-            ->orderByRaw('quantity * buying_price DESC')
-            ->get();
+        $products = Product::with('category')
+            ->where('user_id', $userId)
+            ->where('is_active', true)
+            ->paginate(15);
 
-        $byCategory = Category::where('user_id', $userId)
-            ->withSum(['products as cost_value' => fn($q) => $q->selectRaw('SUM(quantity * buying_price)')], 'buying_price')
-            ->withSum(['products as sell_value' => fn($q) => $q->selectRaw('SUM(quantity * selling_price)')], 'selling_price')
-            ->having('cost_value', '>', 0)
-            ->orderByDesc('cost_value')
-            ->get();
+        $costValue = $products->sum(fn($p) => $p->quantity * $p->buying_price);
+        $revenueValue = $products->sum(fn($p) => $p->quantity * $p->selling_price);
 
-        $totalCost     = $products->sum(fn($p) => $p->quantity * $p->buying_price);
-        $totalRevenue  = $products->sum(fn($p) => $p->quantity * $p->selling_price);
-        $totalProfit   = $totalRevenue - $totalCost;
+        $totals = [
+            'cost_value' => $costValue,
+            'revenue_value' => $revenueValue,
+            'gross_profit' => $revenueValue - $costValue,
+        ];
 
-        if ($request->get('export') === 'csv') {
-            return $this->exportCsv($products, 'stock-value-report');
-        }
+        $byCategory = $products->groupBy('category_id')->map(function ($items) {
+            $cat = $items->first()->category;
 
-        return view('reports.stock-value', compact('products', 'byCategory', 'totalCost', 'totalRevenue', 'totalProfit'));
+            return (object) [
+                'name' => $cat->name ?? 'Uncategorized',
+                'color' => $cat->color ?? '#6366f1',
+                'stock_value' => $items->sum(fn($p) => $p->quantity * $p->buying_price),
+                'total_items' => $items->sum('quantity'),
+                'potential_revenue' => $items->sum(fn($p) => $p->quantity * $p->selling_price),
+            ];
+        })->values();
+
+        return view('reports.stock-value', compact(
+            'products',
+            'totals',
+            'byCategory'
+        ));
     }
 
     public function movements(Request $request)
     {
         $userId = auth()->id();
 
-        $query = StockMovement::where('user_id', $userId)->with('product.category')->latest();
+        $from = $request->from ?? now()->subDays(30)->format('Y-m-d');
+        $to   = $request->to ?? now()->format('Y-m-d');
 
-        if ($request->filled('type'))      $query->where('type', $request->type);
-        if ($request->filled('date_from')) $query->whereDate('created_at', '>=', $request->date_from);
-        if ($request->filled('date_to'))   $query->whereDate('created_at', '<=', $request->date_to);
+        $query = StockMovement::where('user_id', $userId)
+            ->with('product.category')
+            ->latest();
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        $query->whereBetween('created_at', [
+            $from . ' 00:00:00',
+            $to . ' 23:59:59'
+        ]);
 
         $movements = $query->paginate(30)->withQueryString();
 
-        return view('reports.movements', compact('movements'));
+        $stockIn = StockMovement::where('user_id', $userId)
+            ->where('type', 'in')
+            ->whereBetween('created_at', [
+                $from . ' 00:00:00',
+                $to . ' 23:59:59'
+            ])
+            ->sum('quantity');
+
+        $stockOut = StockMovement::where('user_id', $userId)
+            ->where('type', 'out')
+            ->whereBetween('created_at', [
+                $from . ' 00:00:00',
+                $to . ' 23:59:59'
+            ])
+            ->sum('quantity');
+
+        return view('reports.movements', compact(
+            'movements',
+            'from',
+            'to',
+            'stockIn',
+            'stockOut'
+        ));
     }
 
     private function exportCsv($collection, string $filename)

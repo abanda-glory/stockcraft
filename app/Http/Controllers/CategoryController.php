@@ -12,7 +12,7 @@ class CategoryController extends Controller
         $categories = Category::where('user_id', auth()->id())
             ->withCount('products')
             ->orderBy('name')
-            ->get();
+            ->paginate(10);
 
         return view('categories.index', compact('categories'));
     }
@@ -24,11 +24,14 @@ class CategoryController extends Controller
             'color' => 'required|string|max:7',
         ]);
 
-        $data['user_id'] = auth()->id();
-
         Category::firstOrCreate(
-            ['user_id' => auth()->id(), 'name' => $data['name']],
-            ['color' => $data['color']]
+            [
+                'user_id' => auth()->id(),
+                'name' => $data['name']
+            ],
+            [
+                'color' => $data['color']
+            ]
         );
 
         return back()->with('success', 'Category created.');
@@ -51,7 +54,9 @@ class CategoryController extends Controller
     public function destroy(Category $category)
     {
         abort_if($category->user_id !== auth()->id(), 403);
+
         $category->delete();
-        return back()->with('success', 'Category deleted. Products in this category were unlinked.');
+
+        return back()->with('success', 'Category deleted. Products unlinked.');
     }
 }
